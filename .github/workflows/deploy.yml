@@ -1,0 +1,130 @@
+name: Deploy MLOps Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  AWS_REGION: us-east-1
+  TF_WORKING_DIR: infra
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # --------------------------------------------------
+  # Job 1: Terraform — Infrastructure Deployment
+  # --------------------------------------------------
+  terraform:
+    name: Terraform Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.0"
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -var-file=envs/dev/dev.tfvars -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+  # --------------------------------------------------
+  # Job 2: Build & Deploy Lambda Functions
+  # --------------------------------------------------
+  deploy-lambda:
+    name: Build & Deploy Lambda
+    runs-on: ubuntu-latest
+    needs: terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get ECR Repository URL
+        id: ecr-url
+        run: |
+          REPO_URL=$(aws ecr describe-repositories \
+            --repository-names mlops-platform-dev \
+            --query 'repositories[0].repositoryUri' \
+            --output text)
+          echo "repo_url=${REPO_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract Tag Version
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      # --- Training Lambda ---
+      - name: Build Training Image
+        run: |
+          docker build -t ${{ steps.ecr-url.outputs.repo_url }}:training-${{ steps.tag.outputs.version }} \
+            training/
+
+      - name: Push Training Image
+        run: |
+          docker push ${{ steps.ecr-url.outputs.repo_url }}:training-${{ steps.tag.outputs.version }}
+
+      - name: Update Training Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name mlops-platform-dev-training \
+            --image-uri ${{ steps.ecr-url.outputs.repo_url }}:training-${{ steps.tag.outputs.version }} \
+            --no-cli-pager
+
+      # --- Inference Lambda ---
+      - name: Build Inference Image
+        run: |
+          docker build -t ${{ steps.ecr-url.outputs.repo_url }}:inference-${{ steps.tag.outputs.version }} \
+            inference/
+
+      - name: Push Inference Image
+        run: |
+          docker push ${{ steps.ecr-url.outputs.repo_url }}:inference-${{ steps.tag.outputs.version }}
+
+      - name: Update Inference Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name mlops-platform-dev-inference \
+            --image-uri ${{ steps.ecr-url.outputs.repo_url }}:inference-${{ steps.tag.outputs.version }} \
+            --no-cli-pager
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Tag**: ${{ steps.tag.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Training Image**: training-${{ steps.tag.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Inference Image**: inference-${{ steps.tag.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
