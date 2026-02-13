@@ -13,13 +13,13 @@ graph TD
     User[User / Client] -->|HTTPS| APIGW[API Gateway]
     
     subgraph "Inference (Serverless)"
-        APIGW -->|Proxy| InferenceLambda[Inference Lambda<br/>(Python + Scikit-Learn)]
-        InferenceLambda -->|Load Model| S3[S3 Bucket<br/>(Model Artifacts)]
-        InferenceLambda -->|Get Metadata| DDB[DynamoDB<br/>(Model Registry)]
+        APIGW -->|Proxy| InferenceLambda[Inference Lambda<br/> Python + Scikit-Learn]
+        InferenceLambda -->|Load Model| S3[S3 Bucket<br/> Model Artifacts]
+        InferenceLambda -->|Get Metadata| DDB[DynamoDB<br/> Model Registry]
     end
 
     subgraph "Training (Serverless)"
-        Trigger[Event / Schedule] --> TrainingLambda[Training Lambda<br/>(Python + Scikit-Learn)]
+        Trigger[Event / Schedule] --> TrainingLambda[Training Lambda<br/> Python + Scikit-Learn]
         TrainingLambda -->|Pull Data| S3
         TrainingLambda -->|Save Model| S3
         TrainingLambda -->|Register Model| DDB

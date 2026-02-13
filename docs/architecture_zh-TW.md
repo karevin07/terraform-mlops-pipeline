@@ -13,13 +13,13 @@ graph TD
     User[使用者 / 用戶端] -->|HTTPS| APIGW[API Gateway]
     
     subgraph "推論 (Serverless)"
-        APIGW -->|代理請求| InferenceLambda[推論 Lambda<br/>(Python + Scikit-Learn)]
-        InferenceLambda -->|載入模型| S3[S3 Bucket<br/>(模型產物)]
-        InferenceLambda -->|讀取 Metadata| DDB[DynamoDB<br/>(模型註冊表)]
+        APIGW -->|代理請求| InferenceLambda[推論 Lambda<br/> Python + Scikit-Learn]
+        InferenceLambda -->|載入模型| S3[S3 Bucket<br/>模型產物]
+        InferenceLambda -->|讀取 Metadata| DDB[DynamoDB<br/>模型註冊表]
     end
 
     subgraph "訓練 (Serverless)"
-        Trigger[事件 / 排程] --> TrainingLambda[訓練 Lambda<br/>(Python + Scikit-Learn)]
+        Trigger[事件 / 排程] --> TrainingLambda[訓練 Lambda<br/> Python + Scikit-Learn]
         TrainingLambda -->|拉取資料| S3
         TrainingLambda -->|儲存模型| S3
         TrainingLambda -->|註冊模型| DDB
