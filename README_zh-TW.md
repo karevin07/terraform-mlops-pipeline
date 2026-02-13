@@ -92,7 +92,7 @@ flowchart TB
 - **ECR Lifecycle**: 僅保留最近 5 個映像檔
 - **S3 Lifecycle**: 30 天後自動刪除模型產物
 - **Lambda 限制**: 訓練超時設定為 15 分鐘，記憶體設有上限
-- **Terraform 標籤**: 所有資源皆標記 `Project` + `Environment`
+- **Terraform 設定檔**: `infra/` (詳見 [Terraform 指南](docs/terraform_zh-TW.md))所有資源皆標記 `Project` + `Environment`
 
 ## 🚀 核心功能
 

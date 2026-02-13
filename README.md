@@ -93,6 +93,7 @@ flowchart TB
 - **ECR Lifecycle**: Keep only last 5 images
 - **S3 Lifecycle**: Auto-delete model artifacts after 30 days
 - **Lambda Limits**: Training timeout 15min, memory capped
+- **Terraform Configuration**: `infra/` (See [Setup Guide](docs/terraform.md))
 - **Terraform Tags**: All resources tagged with `Project` + `Environment`
 
 ## 🚀 Core Features
