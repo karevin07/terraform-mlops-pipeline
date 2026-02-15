@@ -55,6 +55,8 @@ graph TD
     *   `budgets`: 成本預算監控 ($0.01 限制)。
 
 ### 2. 訓練流水線 (Training Pipeline)
+> 詳細流程請參考: [模型訓練流程](training_process_zh-TW.md)
+
 *   **運算資源**: AWS Lambda (Container Image)。
 *   **映像檔**: 基於 Python 3.9，包含 `scikit-learn`, `pandas`, `boto3`。
 *   **流程**:
