@@ -71,6 +71,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Export requirements
+        run: |
+          uv export --no-dev --extra training --output-file training/requirements.txt
+          uv export --no-dev --output-file inference/requirements.txt
+
       - name: Login to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
