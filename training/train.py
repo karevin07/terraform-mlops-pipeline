@@ -1,14 +1,18 @@
+
 import os
 import boto3
 import pandas as pd
+import numpy as np
 import joblib
 import json
 import logging
 from io import BytesIO
 from datetime import datetime
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from ta.trend import SMAIndicator
+from ta.momentum import RSIIndicator
 
 # Configuration
 S3_RAW_BUCKET = os.environ.get("S3_RAW_BUCKET")
@@ -29,21 +33,71 @@ def load_data(bucket, key="data.csv"):
     obj = s3.get_object(Bucket=bucket, Key=key)
     return pd.read_csv(obj["Body"])
 
+def feature_engineering(df):
+    """
+    Generate technical indicators and lag features for each ticker.
+    """
+    logger.info("Starting feature engineering...")
+    
+    # Ensure data is sorted by Ticker and Date
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df.sort_values(by=['Ticker', 'Date'])
+    
+    # List to store processed dataframes
+    processed_dfs = []
+    
+    # Group by Ticker to avoid data leakage between stocks
+    for ticker, group in df.groupby('Ticker'):
+        group = group.copy()
+        
+        # 1. Technical Indicators
+        # SMA 20
+        sma = SMAIndicator(close=group["Close"], window=20, fillna=True)
+        group["SMA_20"] = sma.sma_indicator()
+        
+        # RSI 14
+        rsi = RSIIndicator(close=group["Close"], window=14, fillna=True)
+        group["RSI_14"] = rsi.rsi()
+        
+        # 2. Lag Features (Previous Day's Close)
+        group["Lag_Close_1"] = group["Close"].shift(1)
+        group["Lag_Volume_1"] = group["Volume"].shift(1)
+        
+        # 3. Target: Predict Next Day's Close
+        group["Target"] = group["Close"].shift(-1)
+        
+        # Drop rows with NaN (due to shift/indicators)
+        group = group.dropna()
+        
+        processed_dfs.append(group)
+        
+    return pd.concat(processed_dfs)
+
 def train_model(df):
     logger.info("Training model...")
-    # Minimal example: predict 'target' from other columns
-    X = df.drop("target", axis=1)
-    y = df["target"]
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Features to use for training
+    features = ["SMA_20", "RSI_14", "Lag_Close_1", "Lag_Volume_1"]
     
-    model = RandomForestClassifier(n_estimators=10, max_depth=5) # Lightweight for Lambda
+    X = df[features]
+    y = df["Target"]
+    
+    # Split data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, shuffle=False) # Time-series split (no shuffle ideally, but simple split here)
+    
+    # RandomForestRegressor
+    model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
     model.fit(X_train, y_train)
     
     preds = model.predict(X_test)
+    
+    # Evaluation Metrics
+    rmse = np.sqrt(mean_squared_error(y_test, preds))
+    mae = mean_absolute_error(y_test, preds)
+    
     metrics = {
-        "accuracy": accuracy_score(y_test, preds),
-        "f1": f1_score(y_test, preds, average="weighted")
+        "rmse": float(rmse),
+        "mae": float(mae)
     }
     
     return model, metrics
@@ -72,17 +126,23 @@ def lambda_handler(event, context):
         # 1. Load Data
         df = load_data(S3_RAW_BUCKET)
         
-        # 2. Train
-        model, metrics = train_model(df)
+        # 2. Feature Engineering
+        df_processed = feature_engineering(df)
+        
+        if df_processed.empty:
+            raise ValueError("No data available for training after feature engineering")
+
+        # 3. Train
+        model, metrics = train_model(df_processed)
         logger.info(f"Training metrics: {metrics}")
         
-        # 3. Save Artifact
+        # 4. Save Artifact
         version = datetime.now().strftime("v%Y%m%d%H%M%S")
-        model_name = "churn-prediction" # Example
+        model_name = "stock-prediction" 
         artifact_key = f"{model_name}/{version}/model.joblib"
         save_model(model, S3_MODEL_BUCKET, artifact_key)
         
-        # 4. Register
+        # 5. Register
         register_model(model_name, version, metrics, f"s3://{S3_MODEL_BUCKET}/{artifact_key}")
         
         return {
