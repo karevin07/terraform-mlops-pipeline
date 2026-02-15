@@ -1,3 +1,4 @@
+
 import os
 import boto3
 import joblib
@@ -9,7 +10,7 @@ from io import BytesIO
 S3_MODEL_BUCKET = os.environ.get("S3_MODEL_BUCKET")
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE")
 REGION = os.environ.get("AWS_REGION", "us-east-1")
-MODEL_NAME = "churn-prediction"
+MODEL_NAME = "stock-prediction"
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -71,13 +72,14 @@ def lambda_handler(event, context):
             return {"statusCode": 400, "body": "Missing 'features' in body"}
         
         # 3. Predict
+        # Expecting features to be a list/array for the model
         prediction = model_cache.predict([features])
         
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({
-                "prediction": int(prediction[0]),
+                "predicted_price": float(prediction[0]),
                 "model_version": model_version
             })
         }
