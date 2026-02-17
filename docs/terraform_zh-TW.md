@@ -50,7 +50,7 @@ aws_region = "ap-northeast-1"
     *   20,000 個 GET Request / 2,000 個 PUT Request 免費。
 *   **CloudWatch**:
     *   Logs 保留設定為 7 天以節省儲存空間。
-    *   Free Tier 提供 5GB Log Data Ingestion、3 個 Dashboards、50 個 Metrics。
+- **S3 Event Notification**: 設定 Raw Data Bucket 自動觸發 Training Lambda (Event-Driven 架構)。
 
 > **💡 建議**：定期檢查 AWS Billing Dashboard，並設定 Budgets 告警 (本專案已包含 Budgets 模組) 以避免意外費用。
 
@@ -69,7 +69,7 @@ cd infra
 初始化工作目錄。此步驟會下載必要的 Providers 並設定 Backend。
 
 ```bash
-terraform init
+make tf-init
 ```
 
 ### 2. 驗證 (Validate)
@@ -77,7 +77,7 @@ terraform init
 檢查設定檔的語法是否正確。
 
 ```bash
-terraform validate
+cd infra && terraform validate
 ```
 
 ### 3. 規劃 (Plan)
@@ -85,20 +85,34 @@ terraform validate
 預覽 Terraform 將對基礎設施進行的變更。
 
 ```bash
-terraform plan
+make tf-plan
 ```
+
+### 3.5. [重要] 建置並推送 Docker Image
+
+Terraform 會建立 ECR Repository，但**不會**自動建置和推送 Docker Image。因此在第一次 `terraform apply` 建立 Lambda 之前，您必須手動推送 Image，否則會出現 `InvalidParameterValueException: Source image does not exist` 錯誤。
+
+我們已提供 `Makefile` 自動化此與流程。
+
+1.  **設定環境變數**:
+    複製 `.env.example` 到 `.env` 並填入您的 AWS Account ID：
+    ```bash
+    cp .env.example .env
+    # 編輯 .env 填入 AWS_ACCOUNT_ID
+    ```
+
+2.  **執行部署指令**:
+    此指令會自動登入 ECR、建置 Image 並推送到 Repository。
+    ```bash
+    make deploy-images
+    ```
 
 ### 4. 套用 (Apply)
 
 建立或更新基礎設施。
 
 ```bash
-terraform apply
-```
-
-若要跳過互動式確認提示：
-```bash
-terraform apply -auto-approve
+make tf-apply
 ```
 
 ### 5. 銷毀 (Destroy)
@@ -106,7 +120,7 @@ terraform apply -auto-approve
 移除所有由 Terraform 建立的資源。**請謹慎使用！**
 
 ```bash
-terraform destroy
+make tf-destroy
 ```
 
 ### 6. 成本估算 (Cost Estimation)
@@ -120,7 +134,7 @@ terraform destroy
     ```
 3.  **查看成本分析**:
     ```bash
-    infracost breakdown --path infra/
+    make cost-estimate
     ```
 
     這將會顯示預估的每月費用明細。

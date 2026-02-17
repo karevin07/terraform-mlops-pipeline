@@ -9,17 +9,17 @@
 - **腳本**: `scripts/fetch_stock_data.py`
 - **主要依賴**: `yfinance`, `boto3`, `pandas`
 - **執行流程**:
-    1.  指定股票代碼 (Tickers)，例如 `2330.TW`, `0050.TW`, `QQQ`。
+    1.  指定股票代碼 (Tickers)，例如 `2330.TW`, `0050.TW`, `QQQ`, `SCHD`。
     2.  下載過去 N 天 (預設 365 天) 的歷史數據。
     3.  處理 MultiIndex 資料結構，將其攤平為標準 CSV 格式。
     4.  將合併後的數據 (`Ticker`, `Date`, `Open`, `High`, `Low`, `Close`, `Volume`) 上傳至 S3 Raw Bucket。
 
 **本地執行範例**:
 ```bash
-# 抓取台積電與 0050 的數據
-export AWS_PROFILE=your-profile
-uv run scripts/fetch_stock_data.py --tickers 2330.TW 0050.TW --bucket your-raw-bucket
+# 抓取台積電與 0050 的數據 (需先在 .env 設定 S3_RAW_BUCKET)
+make fetch-data
 ```
+> **自動化提示**: 執行 `make fetch-data` 上傳檔案後，AWS S3 會自動觸發 Lambda 進行訓練 (Event-Driven)。您可以到 AWS Console 查看 CloudWatch Logs 確認。
 
 ## 2. 特徵工程 (Feature Engineering)
 
@@ -77,15 +77,47 @@ uv run scripts/fetch_stock_data.py --tickers 2330.TW 0050.TW --bucket your-raw-b
 我們提供了一個測試腳本來模擬 Lambda 環境：
 
 ```bash
-# 生成測試用的假數據 (可選)
-uv run tests/generate_sample_data.py
+# 自動生成假數據並執行測試
+make test-local-training
+```
 
-# 設定環境變數並執行
-export S3_RAW_BUCKET=test-bucket
-export S3_MODEL_BUCKET=test-bucket
-export DYNAMODB_TABLE=test-table
-export AWS_REGION=us-east-1
+## 6. 驗證與成果 (Verification)
 
-# 執行訓練邏輯
-uv run tests/test_train_local.py
+當您執行 `make fetch-data` 觸發訓練後，可以透過以下方式驗證成果：
+
+### 6.1 檢查 CloudWatch Logs (確認訓練執行)
+查看 Lambda 的執行日誌，確認是否成功觸發並完成訓練：
+
+```bash
+# 列出最近的 Log Streams
+aws logs describe-log-streams \
+    --log-group-name /aws/lambda/mlops-platform-dev-training \
+    --order-by LastEventTime \
+    --descending \
+    --limit 3
+
+# 取得特定 Stream 的 Log Events (請替換 <log-stream-name>)
+aws logs get-log-events \
+    --log-group-name /aws/lambda/mlops-platform-dev-training \
+    --log-stream-name "<log-stream-name>"
+```
+
+### 6.2 檢查 S3 Model Artifacts (確認模型產出)
+確認模型檔案 (`.joblib`) 是否已儲存到 S3 Model Bucket：
+
+```bash
+# 列出 Model Bucket 中的物件 (需替換 <your-model-bucket>)
+aws s3 ls s3://<your-model-bucket>/stock-prediction/ --recursive
+```
+
+### 6.3 檢查 DynamoDB Metadata (確認註冊資訊)
+查詢 DynamoDB Table，確認最新的模型版本與評估指標 (RMSE, MAE)：
+
+```bash
+# 掃描 DynamoDB Table (需替換 <your-table-name>)
+aws dynamodb scan \
+    --table-name <your-table-name> \
+    --expression-attribute-names '{"#S": "Status"}' \
+    --expression-attribute-values '{":v": {"S": "training"}}' \
+    --filter-expression "#S = :v"
 ```

@@ -40,6 +40,7 @@ This project is designed to stay within the AWS Free Tier. Key limits:
 *   **CloudWatch**: 5GB log ingestion and 5GB storage per month.
     *   **Note**: Log retention is set to 7 days to prevent storage costs from accumulating.
 *   **S3**: 5GB standard storage (12 months free).
+*   **S3 Event Notification**: Configure Raw Data Bucket to automatically trigger Training Lambda (Event-Driven Architecture).
 
 > **Note**: Free Tier limits are per account. If you have other projects running, verify your total usage.
 
@@ -77,6 +78,25 @@ Preview the changes that Terraform will make to your infrastructure.
 terraform plan
 ```
 
+### 3.5. [IMPORTANT] Build and Push Docker Images
+
+Terraform creates the ECR Repository but **does not** automatically build or push Docker images. Therefore, before the first `terraform apply` creates the Lambda functions, you must manually push the images; otherwise, you will encounter an `InvalidParameterValueException: Source image does not exist` error.
+
+We provide a `Makefile` to automate this process.
+
+1.  **Configure Environment Variables**:
+    Copy `.env.example` to `.env` and fill in your AWS Account ID:
+    ```bash
+    cp .env.example .env
+    # Edit .env and set AWS_ACCOUNT_ID
+    ```
+
+2.  **Run Deployment Command**:
+    This command will automatically log in to ECR, build the images, and push them to the repository.
+    ```bash
+    make deploy-images
+    ```
+
 ### 4. Apply
 
 Create or update the infrastructure.
@@ -109,7 +129,7 @@ Use `infracost` to estimate cloud costs for the project.
     ```
 3.  **View Cost Breakdown**:
     ```bash
-    infracost breakdown --path infra/
+    make cost-estimate
     ```
 
     This will show the estimated monthly cost breakdown.
