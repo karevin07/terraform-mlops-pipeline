@@ -73,3 +73,27 @@ module "budgets" {
   environment  = var.environment
   alert_email  = var.alert_email
 }
+
+# --- Event Driven Architecture ---
+
+# 1. Allow S3 to invoke Training Lambda
+resource "aws_lambda_permission" "allow_s3_training" {
+  statement_id  = "AllowExecutionFromS3Bucket"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda.training_function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = "arn:aws:s3:::${module.s3.raw_bucket_id}"
+}
+
+# 2. Trigger Training Lambda on S3 Upload
+resource "aws_s3_bucket_notification" "bucket_notification" {
+  bucket = module.s3.raw_bucket_id
+
+  lambda_function {
+    lambda_function_arn = module.lambda.training_function_arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".csv"
+  }
+
+  depends_on = [aws_lambda_permission.allow_s3_training]
+}
