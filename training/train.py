@@ -123,8 +123,19 @@ def register_model(model_name, version, metrics, artifact_path):
 
 def lambda_handler(event, context):
     try:
+        # Check if triggered by S3 Event
+        if "Records" in event and event["Records"][0]["eventSource"] == "aws:s3":
+            bucket = event["Records"][0]["s3"]["bucket"]["name"]
+            key = event["Records"][0]["s3"]["object"]["key"]
+            logger.info(f"Triggered by S3 event: s3://{bucket}/{key}")
+        else:
+            # Fallback for manual invocation (e.g. Test)
+            bucket = S3_RAW_BUCKET
+            key = "data.csv"
+            logger.info(f"Triggered manually, using default: s3://{bucket}/{key}")
+
         # 1. Load Data
-        df = load_data(S3_RAW_BUCKET)
+        df = load_data(bucket, key)
         
         # 2. Feature Engineering
         df_processed = feature_engineering(df)
