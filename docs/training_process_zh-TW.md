@@ -52,6 +52,7 @@ make fetch-data
     -   **MAE** (Mean Absolute Error)
 - **產出物 (Artifacts)**:
     -   模型檔案: `model.joblib`
+    -   ONNX 模型 (推論用): `model.onnx`
     -   儲存位置: `s3://<model-bucket>/stock-prediction/<version>/model.joblib`
 
 ## 4. 模型註冊 (Model Registry)
@@ -63,7 +64,8 @@ make fetch-data
     -   `ModelName`: "stock-prediction"
     -   `Version`: 時間戳記 (例如 `v20231027120000`)
     -   `Metrics`: 訓練指標 (RMSE, MAE)
-    -   `ArtifactUrl`: S3 路徑
+    -   `ArtifactUrl`: S3 路徑 (Joblib)
+    -   `OnnxUrl`: S3 路徑 (ONNX)
     -   `CreatedAt`: 訓練時間
 
 ## 5. 本地開發與測試 (Local Development)
@@ -83,41 +85,25 @@ make test-local-training
 
 ## 6. 驗證與成果 (Verification)
 
-當您執行 `make fetch-data` 觸發訓練後，可以透過以下方式驗證成果：
+當您執行 `make fetch-data` 觸發訓練後，可以透過以下 `make` 指令快速驗證成果：
 
 ### 6.1 檢查 CloudWatch Logs (確認訓練執行)
-查看 Lambda 的執行日誌，確認是否成功觸發並完成訓練：
+查看最近 1 小時的 Training Lambda 執行日誌：
 
 ```bash
-# 列出最近的 Log Streams
-aws logs describe-log-streams \
-    --log-group-name /aws/lambda/mlops-platform-dev-training \
-    --order-by LastEventTime \
-    --descending \
-    --limit 3
-
-# 取得特定 Stream 的 Log Events (請替換 <log-stream-name>)
-aws logs get-log-events \
-    --log-group-name /aws/lambda/mlops-platform-dev-training \
-    --log-stream-name "<log-stream-name>"
+make logs-training
 ```
 
 ### 6.2 檢查 S3 Model Artifacts (確認模型產出)
-確認模型檔案 (`.joblib`) 是否已儲存到 S3 Model Bucket：
+列出 S3 Bucket 中的模型檔案：
 
 ```bash
-# 列出 Model Bucket 中的物件 (需替換 <your-model-bucket>)
-aws s3 ls s3://<your-model-bucket>/stock-prediction/ --recursive
+make check-model
 ```
 
 ### 6.3 檢查 DynamoDB Metadata (確認註冊資訊)
-查詢 DynamoDB Table，確認最新的模型版本與評估指標 (RMSE, MAE)：
+查詢 DynamoDB 中的模型註冊紀錄：
 
 ```bash
-# 掃描 DynamoDB Table (需替換 <your-table-name>)
-aws dynamodb scan \
-    --table-name <your-table-name> \
-    --expression-attribute-names '{"#S": "Status"}' \
-    --expression-attribute-values '{":v": {"S": "training"}}' \
-    --filter-expression "#S = :v"
+make check-metadata
 ```

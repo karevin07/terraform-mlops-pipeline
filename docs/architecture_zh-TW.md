@@ -13,7 +13,7 @@ graph TD
     User[使用者 / 用戶端] -->|HTTPS| APIGW[API Gateway]
     
     subgraph "推論 (Serverless)"
-        APIGW -->|代理請求| InferenceLambda[推論 Lambda<br/> Python + Scikit-Learn]
+        APIGW -->|代理請求| InferenceLambda[推論 Lambda<br/> Golang + Gin + ONNX]
         InferenceLambda -->|載入模型| S3[S3 Bucket<br/>模型產物]
         InferenceLambda -->|讀取 Metadata| DDB[DynamoDB<br/>模型註冊表]
     end
