@@ -13,6 +13,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from ta.trend import SMAIndicator
 from ta.momentum import RSIIndicator
+from skl2onnx import convert_sklearn
+from skl2onnx.common.data_types import FloatTensorType
 
 # Configuration
 S3_RAW_BUCKET = os.environ.get("S3_RAW_BUCKET")
@@ -109,6 +111,17 @@ def save_model(model, bucket, key):
     buffer.seek(0)
     s3.put_object(Bucket=bucket, Key=key, Body=buffer)
 
+def save_onnx_model(model, bucket, key):
+    logger.info(f"Saving ONNX model to s3://{bucket}/{key}")
+    # Define input type: 4 features (SMA_20, RSI_14, Lag_Close_1, Lag_Volume_1)
+    initial_type = [('float_input', FloatTensorType([None, 4]))]
+    onx = convert_sklearn(model, initial_types=initial_type, target_opset=19)
+    
+    buffer = BytesIO()
+    buffer.write(onx.SerializeToString())
+    buffer.seek(0)
+    s3.put_object(Bucket=bucket, Key=key, Body=buffer)
+
 def register_model(model_name, version, metrics, artifact_path):
     logger.info(f"Registering model {model_name}:{version} to DynamoDB")
     item = {
@@ -117,6 +130,7 @@ def register_model(model_name, version, metrics, artifact_path):
         "Status": "training",
         "Metrics": json.dumps(metrics),
         "ArtifactUrl": artifact_path,
+        "OnnxUrl": artifact_path.replace(".joblib", ".onnx"),
         "CreatedAt": datetime.utcnow().isoformat()
     }
     table.put_item(Item=item)
@@ -151,7 +165,10 @@ def lambda_handler(event, context):
         version = datetime.now().strftime("v%Y%m%d%H%M%S")
         model_name = "stock-prediction" 
         artifact_key = f"{model_name}/{version}/model.joblib"
+        onnx_key = f"{model_name}/{version}/model.onnx"
+        
         save_model(model, S3_MODEL_BUCKET, artifact_key)
+        save_onnx_model(model, S3_MODEL_BUCKET, onnx_key)
         
         # 5. Register
         register_model(model_name, version, metrics, f"s3://{S3_MODEL_BUCKET}/{artifact_key}")

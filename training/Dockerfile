@@ -1,4 +1,9 @@
-FROM public.ecr.aws/lambda/python:3.9
+FROM public.ecr.aws/lambda/python:3.12
+
+# Install build dependencies
+RUN dnf update -y && \
+    dnf install -y gcc-c++ && \
+    dnf clean all
 
 # Install dependencies
 COPY requirements.txt .
