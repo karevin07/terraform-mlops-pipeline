@@ -1,0 +1,41 @@
+# MacOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!example.tfvars
+.terraform.lock.hcl
+tfplan
+
+# Editor
+.idea/
+.vscode/
+
+# AWS
+.aws/
+
+# Docker
+.docker/
+
+# Secret File
+secret_key_file/
+
+# Local Artifacts
+model.onnx
+response.json
