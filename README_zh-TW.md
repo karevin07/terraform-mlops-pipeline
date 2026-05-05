@@ -1,4 +1,4 @@
-# AWS 免費方案 MLOps 流水線
+# AWS 免費方案 MLOps Pipeline
 
 ![Terraform](https://img.shields.io/badge/Terraform-6222CC?style=for-the-badge&logo=terraform&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
@@ -137,7 +137,6 @@ terraform-mlops-pipeline/
 ├── training/               # Python 機器學習訓練代碼
 ├── inference/              # 推論處理程式
 ├── registry/               # 架構文件
-├── ci/                     # GitHub Actions 設定 (詳見 docs/cicd_zh-TW.md)
 ├── ci/                     # GitHub Actions 設定 (詳見 docs/cicd_zh-TW.md)
 └── docs/                   # 架構 (docs/architecture_zh-TW.md) 與 決策 (docs/decisions_zh-TW.md)
 ```
