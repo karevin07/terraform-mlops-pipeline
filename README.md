@@ -140,6 +140,5 @@ terraform-mlops-pipeline/
 ├── inference/              # Inference handler
 ├── registry/               # Schema docs
 ├── ci/                     # GitHub Actions (See docs/cicd.md)
-├── ci/                     # GitHub Actions (See docs/cicd.md)
 └── docs/                   # Architecture (docs/architecture.md) & Decisions (docs/decisions.md)
 ```
