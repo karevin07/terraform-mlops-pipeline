@@ -105,7 +105,7 @@ except Exception as e:
 ## 4. 常見問題 (FAQ)
 
 ### Q: 為什麼收到 503 `Service unavailable`?
-**A**: 這表示目前沒有可用的穩定模型 (Stable Model)。請聯繫管理員確認訓練工作是否已完成且模型已註冊為 stable 狀態。
+**A**: 這表示目前沒有可用的穩定模型 (Stable Model)。請確認訓練工作是否已完成且模型已註冊為 stable 狀態。
 
 ### Q: 為什麼收到 404 `Not Found`?
-**A**: 請確認 URL 是否正確 (包含 `/predict`)。若 URL 正確仍發生此錯誤，可能是 API Gateway Configuring 問題，請聯繫 DevOps 團隊。
+**A**: 請確認 URL 是否正確 (包含 `/predict`)。若 URL 正確仍發生此錯誤，可能是 API Gateway Configuring 問題。
