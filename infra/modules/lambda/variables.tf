@@ -36,3 +36,18 @@ variable "api_gateway_execution_arn" {
   description = "API Gateway execution ARN for Lambda permission"
   type        = string
 }
+
+variable "rmse_threshold" {
+  type    = string
+  default = "100.0"
+}
+
+variable "mae_threshold" {
+  type    = string
+  default = "80.0"
+}
+
+variable "canary_traffic_percent" {
+  type    = string
+  default = "10"
+}

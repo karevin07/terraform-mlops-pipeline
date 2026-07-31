@@ -14,6 +14,8 @@ resource "aws_lambda_function" "training" {
       S3_MODEL_BUCKET   = var.s3_model_bucket
       DYNAMODB_TABLE    = var.dynamodb_table_name
       ENVIRONMENT       = var.environment
+      RMSE_THRESHOLD    = var.rmse_threshold
+      MAE_THRESHOLD     = var.mae_threshold
     }
   }
 
@@ -34,9 +36,10 @@ resource "aws_lambda_function" "inference" {
 
   environment {
     variables = {
-      S3_MODEL_BUCKET = var.s3_model_bucket
-      DYNAMODB_TABLE  = var.dynamodb_table_name
-      ENVIRONMENT     = var.environment
+      S3_MODEL_BUCKET        = var.s3_model_bucket
+      DYNAMODB_TABLE         = var.dynamodb_table_name
+      ENVIRONMENT            = var.environment
+      CANARY_TRAFFIC_PERCENT = var.canary_traffic_percent
     }
   }
 
