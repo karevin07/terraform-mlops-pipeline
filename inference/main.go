@@ -28,6 +28,7 @@ var (
 	dynamoClient *dynamodb.Client
 	modelCache   *ort.DynamicAdvancedSession
 	modelVersion string
+	servingLane  string
 	modelMutex   sync.RWMutex
 )
 
@@ -46,6 +47,7 @@ type PredictRequest struct {
 type PredictResponse struct {
 	PredictedPrice float32 `json:"predicted_price"`
 	ModelVersion   string  `json:"model_version"`
+	ServingLane    string  `json:"serving_lane"`
 }
 
 func init() {
@@ -105,14 +107,20 @@ func predictHandler(c *gin.Context) {
 	// Load model if not cached
 	if err := ensureModelLoaded(context.Background()); err != nil {
 		log.Printf("Model load failed: %v", err)
-		c.JSON(503, gin.H{"error": "Service unavailable"})
+		message := err.Error()
+		if strings.Contains(message, "promote-stable") || strings.Contains(message, "no stable") {
+			c.JSON(503, gin.H{"error": message})
+		} else {
+			c.JSON(503, gin.H{"error": "Service unavailable"})
+		}
 		return
 	}
 
 	modelMutex.RLock()
+	defer modelMutex.RUnlock()
 	session := modelCache
 	version := modelVersion
-	modelMutex.RUnlock()
+	lane := servingLane
 
 	if session == nil {
 		c.JSON(500, gin.H{"error": "Model not loaded"})
@@ -165,27 +173,21 @@ func predictHandler(c *gin.Context) {
 	c.JSON(200, PredictResponse{
 		PredictedPrice: prediction,
 		ModelVersion:   version,
+		ServingLane:    lane,
 	})
 }
 
 func ensureModelLoaded(ctx context.Context) error {
-	modelMutex.RLock()
-	if modelCache != nil {
-		modelMutex.RUnlock()
-		return nil
-	}
-	modelMutex.RUnlock()
-
-	modelMutex.Lock()
-	defer modelMutex.Unlock()
-
-	// Double check
-	if modelCache != nil {
-		return nil
-	}
-
 	// Local Development Override
 	if localPath := os.Getenv("LOCAL_MODEL_PATH"); localPath != "" {
+		modelMutex.Lock()
+		defer modelMutex.Unlock()
+
+		if modelCache != nil && modelVersion == "local" {
+			servingLane = "local"
+			return nil
+		}
+
 		log.Printf("Loading model from local path: %s", localPath)
 		inputNames := []string{"float_input"}
 		outputNames := []string{"variable"}
@@ -193,71 +195,65 @@ func ensureModelLoaded(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create local onnx session: %w", err)
 		}
+		if modelCache != nil {
+			if err := modelCache.Destroy(); err != nil {
+				log.Printf("Warning: Failed to destroy previous ONNX session: %v", err)
+			}
+		}
 		modelCache = session
 		modelVersion = "local"
+		servingLane = "local"
 		return nil
 	}
 
-	// 1. Get latest stable version from DynamoDB
-	// Query: ModelName = :name, Filter: Status = stable OR canary
-	// Using Query on GSI or standard Query if PK is ModelName
-	// infra/modules/dynamodb/main.tf shows schema.
-	// Usually PK=ModelName, SK=Version
-
-	// We'll mimic Python logic: Query latest, verify status
-	// Note: Assuming PK=ModelName, SK=Version (Sort desc)
 	out, err := dynamoClient.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(DynamoDBTable),
 		KeyConditionExpression: aws.String("ModelName = :name"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":name": &types.AttributeValueMemberS{Value: ModelName},
 		},
-		ScanIndexForward: aws.Bool(false), // Descending
-		Limit:            aws.Int32(5),
+		ScanIndexForward: aws.Bool(false),
+		Limit:            aws.Int32(20),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to query dynamodb: %w", err)
 	}
 
-	var targetItem map[string]types.AttributeValue
+	items := make([]RegistryModel, 0, len(out.Items))
 	for _, item := range out.Items {
-		status := ""
-		if v, ok := item["Status"].(*types.AttributeValueMemberS); ok {
-			status = v.Value
+		registryModel := RegistryModel{}
+		if value, ok := item["Version"].(*types.AttributeValueMemberS); ok {
+			registryModel.Version = value.Value
 		}
-		if status == "stable" || status == "canary" {
-			targetItem = item
-			break
+		if value, ok := item["OnnxUrl"].(*types.AttributeValueMemberS); ok {
+			registryModel.OnnxURL = value.Value
 		}
-	}
-
-	if targetItem == nil {
-		return fmt.Errorf("no stable model found")
-	}
-
-	// get OnnxUrl
-	var onnxUrl string
-	if v, ok := targetItem["OnnxUrl"].(*types.AttributeValueMemberS); ok {
-		onnxUrl = v.Value
-	} else {
-		// Fallback or Try ArtifactUrl if .onnx?
-		// Let's check ArtifactUrl
-		if _, ok := targetItem["ArtifactUrl"].(*types.AttributeValueMemberS); ok {
-			// If python didn't set OnnxUrl yet, we might fail.
-			// But we updated python code.
-			// If running against OLD records, this will fail.
-			return fmt.Errorf("model OnnxUrl not found")
+		if value, ok := item["Status"].(*types.AttributeValueMemberS); ok {
+			registryModel.Status = value.Value
 		}
+		items = append(items, registryModel)
 	}
 
-	version := ""
-	if v, ok := targetItem["Version"].(*types.AttributeValueMemberS); ok {
-		version = v.Value
+	stable, canary := LatestStableAndCanary(items)
+	choice := SelectLane(stable, canary, CanaryTrafficPercent())
+	if choice == nil {
+		return fmt.Errorf("no stable or canary model found; run make promote-stable")
 	}
 
-	// 2. Download from S3
+	modelMutex.Lock()
+	defer modelMutex.Unlock()
+
+	if modelCache != nil && modelVersion == choice.Version {
+		servingLane = choice.Lane
+		return nil
+	}
+
+	if choice.OnnxURL == "" {
+		return fmt.Errorf("model OnnxUrl not found")
+	}
+
 	bucket := S3ModelBucket
-	key := strings.Replace(onnxUrl, fmt.Sprintf("s3://%s/", bucket), "", 1)
+	key := strings.Replace(choice.OnnxURL, fmt.Sprintf("s3://%s/", bucket), "", 1)
 
 	log.Printf("Downloading model from s3://%s/%s", bucket, key)
 
@@ -282,8 +278,6 @@ func ensureModelLoaded(ctx context.Context) error {
 		return fmt.Errorf("failed to write model file: %w", err)
 	}
 
-	// 3. Load ONNX Session
-	// Define input/output names matching skl2onnx export (`training/train.py`)
 	inputNames := []string{"float_input"}
 	outputNames := []string{"variable"}
 
@@ -297,8 +291,14 @@ func ensureModelLoaded(ctx context.Context) error {
 		return fmt.Errorf("failed to create onnx session: %w", err)
 	}
 
+	if modelCache != nil {
+		if err := modelCache.Destroy(); err != nil {
+			log.Printf("Warning: Failed to destroy previous ONNX session: %v", err)
+		}
+	}
 	modelCache = session
-	modelVersion = version
+	modelVersion = choice.Version
+	servingLane = choice.Lane
 	return nil
 }
 
