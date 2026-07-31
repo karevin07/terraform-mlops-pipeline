@@ -115,6 +115,20 @@ flowchart TB
 - **CI/CD**: GitHub Actions
 - **資料庫**: DynamoDB (元數據), S3 (產物)
 
+## Demo：模型生命週期
+
+```bash
+make fetch-data          # 或上傳 CSV → 觸發訓練
+make check-metadata      # 預期 staging 或 canary
+make list-models
+make promote-stable VERSION=v...
+make predict-lambda      # 注意 model_version + serving_lane
+make rollback VERSION=v...
+make predict-lambda
+```
+
+**Bootstrap 提示**：若僅有 `staging`，仍可直接 `make promote-stable` 從 staging 升級；若僅有 `canary`，推論會 100% 走 canary，直到 promote 為止。
+
 ## 📂 專案結構
 
 ```text

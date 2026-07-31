@@ -39,3 +39,8 @@
 **Context**: Need automated alerting if any resource accidentally incurs cost.
 **Decision**: Set AWS Budgets alarm at **$0.01 threshold** with email notification.
 **Consequences**: Immediate notification on any non-Free-Tier usage.
+
+## 6. Registry Promotion Policy (staging → canary → stable)
+**Context**: Inference only serves canary/stable; training must not silently become production.
+**Decision**: Auto `staging`; auto `canary` on metric gate; manual `stable` via CLI; app-level canary traffic before Lambda alias weights.
+**Consequences**: Clear demo story; requires operator promote for production lane.

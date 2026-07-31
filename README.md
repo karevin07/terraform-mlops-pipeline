@@ -116,6 +116,20 @@ flowchart TB
 - **CI/CD**: GitHub Actions
 - **Database**: DynamoDB (Metadata), S3 (Artifacts)
 
+## Demo: model lifecycle
+
+```bash
+make fetch-data          # or upload CSV → triggers training
+make check-metadata      # expect staging or canary
+make list-models
+make promote-stable VERSION=v...
+make predict-lambda      # note model_version + serving_lane
+make rollback VERSION=v...
+make predict-lambda
+```
+
+**Bootstrap note**: If only `staging` exists, still run `make promote-stable` from staging. If only `canary` exists, inference serves 100% canary until promote.
+
 ## 📂 Project Structure
 
 ```text

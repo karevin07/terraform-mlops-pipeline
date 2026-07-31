@@ -18,7 +18,14 @@ This document defines the schema and access patterns for the serverless Model Re
 | `Metrics` | String (JSON) | Serialized evaluation metrics (e.g., `{"rmse": 1.23, "mae": 0.98}`) |
 | `CreatedAt` | String | ISO 8601 Timestamp |
 | `CreatedBy` | String | Optional: User or System ID |
-| `Config` | Map | Optional: Hyperparameters used for training |
+| `Config` | String (JSON) | Optional: Training hyperparameters and gate metadata. May include `rmse_threshold`, `mae_threshold`, and `gate_status`. |
+
+## Lifecycle (Phase 0)
+
+1. Training registers `staging`, or `canary` if RMSE/MAE pass thresholds.
+2. Operator runs `make promote-stable VERSION=...` → `stable` (previous `stable` → `archived`).
+3. `make rollback VERSION=...` restores an older version to `stable`.
+4. Inference serves `stable` and optionally `canary` via `CANARY_TRAFFIC_PERCENT`.
 
 ## Access Patterns
 

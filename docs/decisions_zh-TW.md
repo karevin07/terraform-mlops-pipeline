@@ -39,3 +39,8 @@
 **背景**: 需要在資源意外產生費用時獲得自動警報。
 **決策**: 設定 AWS Budgets 警報，閾值設為 **$0.01**，並發送 Email 通知。
 **後果**: 任何超出 Free Tier 的使用量都會立即觸發通知。
+
+## 6. 模型註冊推廣政策 (staging → canary → stable)
+**背景**: 推論只服務 canary/stable；訓練不得靜默成為正式線上版本。
+**決策**: 自動寫入 `staging`；指標過門檻自動升 `canary`；`stable` 需手動 CLI 確認；先做應用層 canary 流量，之後再升 Lambda alias 權重。
+**後果**: Demo 故事清晰；正式流量需操作者 promote。
