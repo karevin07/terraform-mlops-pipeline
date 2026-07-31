@@ -1,7 +1,7 @@
 # Design: MLOps Portfolio Roadmap (Promote / Canary / Observability / CI)
 
 **Date**: 2026-07-31  
-**Status**: Draft for review  
+**Status**: Phase 0 implemented  
 **Goal**: Turn this Free-Tier serverless repo into an interview-ready MLOps side project with a closed E2E loop, then deepen platform capabilities.
 
 ## 1. Context
