@@ -4,6 +4,7 @@
 ![Terraform](https://img.shields.io/badge/Terraform-6222CC?style=for-the-badge&logo=terraform&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
@@ -35,7 +36,7 @@ flowchart TB
 
         subgraph Compute["Serverless Compute"]
             LAMBDA_TRAIN[Lambda - Training Job<br/>Python]
-            LAMBDA_INFER[Lambda - Inference API<br/>Python]
+            LAMBDA_INFER[Lambda - Inference API<br/>Go + ONNX]
         end
 
         subgraph Registry["Model Registry"]
@@ -99,9 +100,9 @@ flowchart TB
 ## 🚀 Core Features
 
 1. **Feature pipeline (Python)**: Lambda-based feature engineering
-2. **Automated training**: Lambda with 15-min timeout
+2. **Automated training**: Lambda with 15-min timeout; exports `joblib` + ONNX
 3. **Model registry**: DynamoDB metadata + S3 artifacts (versioned)
-4. **Inference API**: Lambda behind API Gateway
+4. **Inference API**: Go (Gin) + ONNX Runtime Lambda behind API Gateway
 5. **Canary deployment**: Lambda alias weighted routing
 6. **Model rollback**: Update DynamoDB metadata — no redeploy needed
 7. **Infra as Code**: Terraform modular design
@@ -110,8 +111,8 @@ flowchart TB
 ## 🛠 Tech Stack
 
 - **Infrastructure**: Terraform, AWS (Free Tier)
-- **ML/Data**: Python (Pandas, Scikit-learn)
-- **Serving**: Python Lambda (container image)
+- **ML/Data**: Python (Pandas, Scikit-learn, skl2onnx)
+- **Serving**: Go Lambda (Gin + ONNX Runtime, container image)
 - **CI/CD**: GitHub Actions
 - **Database**: DynamoDB (Metadata), S3 (Artifacts)
 
@@ -136,9 +137,9 @@ terraform-mlops-pipeline/
 │   ├── variables.tf
 │   ├── providers.tf
 │   └── versions.tf
-├── training/               # Python ML
-├── inference/              # Inference handler
-├── registry/               # Schema docs
-├── ci/                     # GitHub Actions (See docs/cicd.md)
+├── training/               # Python ML training (scikit-learn → ONNX)
+├── inference/              # Go inference API (Gin + ONNX Runtime)
+├── registry/               # Model registry schema docs
+├── .github/workflows/      # GitHub Actions (See docs/cicd.md)
 └── docs/                   # Architecture (docs/architecture.md) & Decisions (docs/decisions.md)
 ```

@@ -3,6 +3,7 @@
 ![Terraform](https://img.shields.io/badge/Terraform-6222CC?style=for-the-badge&logo=terraform&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Go](https://img.shields.io/badge/Go-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
@@ -34,7 +35,7 @@ flowchart TB
 
         subgraph Compute["無伺服器運算"]
             LAMBDA_TRAIN[Lambda - 訓練任務<br/>Python]
-            LAMBDA_INFER[Lambda - 推論 API<br/>Python]
+            LAMBDA_INFER[Lambda - 推論 API<br/>Go + ONNX]
         end
 
         subgraph Registry["模型註冊"]
@@ -92,14 +93,15 @@ flowchart TB
 - **ECR Lifecycle**: 僅保留最近 5 個映像檔
 - **S3 Lifecycle**: 30 天後自動刪除模型產物
 - **Lambda 限制**: 訓練超時設定為 15 分鐘，記憶體設有上限
-- **Terraform 設定檔**: `infra/` (詳見 [Terraform 指南](docs/terraform_zh-TW.md))所有資源皆標記 `Project` + `Environment`
+- **Terraform 設定檔**: `infra/` (詳見 [Terraform 指南](docs/terraform_zh-TW.md))
+- **Terraform Tags**: 所有資源皆標記 `Project` + `Environment`
 
 ## 🚀 核心功能
 
 1. **特徵流水線 (Python)**: 基於 Lambda 的特徵工程
-2. **自動化訓練**: 具備 15 分鐘超時限制的 Lambda
+2. **自動化訓練**: 具備 15 分鐘超時限制的 Lambda；匯出 `joblib` + ONNX
 3. **模型註冊**: DynamoDB 元數據 + S3 產物 (版本化)
-4. **推論 API**: API Gateway 後端的 Lambda
+4. **推論 API**: Go (Gin) + ONNX Runtime Lambda，經 API Gateway 對外服務
 5. **金絲雀部署**: Lambda 別名權重路由 (Weighted Routing)
 6. **模型回滾**: 更新 DynamoDB 元數據 — 無需重新部署
 7. **基礎設施即程式碼 (IaC)**: Terraform 模組化設計
@@ -108,8 +110,8 @@ flowchart TB
 ## 🛠 技術棧
 
 - **基礎設施**: Terraform, AWS (免費方案)
-- **ML/數據**: Python (Pandas, Scikit-learn)
-- **服務**: Python Lambda (容器映像檔)
+- **ML/數據**: Python (Pandas, Scikit-learn, skl2onnx)
+- **服務**: Go Lambda (Gin + ONNX Runtime，容器映像檔)
 - **CI/CD**: GitHub Actions
 - **資料庫**: DynamoDB (元數據), S3 (產物)
 
@@ -134,9 +136,9 @@ terraform-mlops-pipeline/
 │   ├── variables.tf
 │   ├── providers.tf
 │   └── versions.tf
-├── training/               # Python 機器學習訓練代碼
-├── inference/              # 推論處理程式
-├── registry/               # 架構文件
-├── ci/                     # GitHub Actions 設定 (詳見 docs/cicd_zh-TW.md)
+├── training/               # Python 機器學習訓練 (scikit-learn → ONNX)
+├── inference/              # Go 推論 API (Gin + ONNX Runtime)
+├── registry/               # 模型註冊表 schema
+├── .github/workflows/      # GitHub Actions 設定 (詳見 docs/cicd_zh-TW.md)
 └── docs/                   # 架構 (docs/architecture_zh-TW.md) 與 決策 (docs/decisions_zh-TW.md)
 ```

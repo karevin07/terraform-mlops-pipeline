@@ -47,8 +47,9 @@ git push origin v0.1.0
     *   規劃變更 (`terraform plan`)。
     *   套用變更 (`terraform apply -auto-approve`)。
 2.  **`deploy-lambda`** (在 `terraform` 成功後執行):
+    *   匯出訓練映像檔所需的 Python 依賴 (`training/requirements.txt`)。
     *   登入 Amazon ECR。
-    *   建置訓練 (Training) 與推論 (Inference) 的 Docker 映像檔。
+    *   建置 Docker 映像檔：**訓練 (Python)** 與 **推論 (Go + ONNX Runtime)**。
     *   推送映像檔至 ECR。
     *   更新 Lambda 函數以使用新的映像檔。
 

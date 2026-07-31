@@ -51,9 +51,11 @@ make fetch-data
     -   **RMSE** (Root Mean Squared Error)
     -   **MAE** (Mean Absolute Error)
 - **產出物 (Artifacts)**:
-    -   模型檔案: `model.joblib`
+    -   模型檔案 (血緣／除錯): `model.joblib`
     -   ONNX 模型 (推論用): `model.onnx`
-    -   儲存位置: `s3://<model-bucket>/stock-prediction/<version>/model.joblib`
+    -   儲存位置:
+        -   `s3://<model-bucket>/stock-prediction/<version>/model.joblib`
+        -   `s3://<model-bucket>/stock-prediction/<version>/model.onnx`
 
 ## 4. 模型註冊 (Model Registry)
 

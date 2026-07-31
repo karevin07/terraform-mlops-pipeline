@@ -14,14 +14,14 @@ graph TD
     
     subgraph "推論 (Serverless)"
         APIGW -->|代理請求| InferenceLambda[推論 Lambda<br/> Golang + Gin + ONNX]
-        InferenceLambda -->|載入模型| S3[S3 Bucket<br/>模型產物]
+        InferenceLambda -->|載入 ONNX 模型| S3[S3 Bucket<br/>模型產物]
         InferenceLambda -->|讀取 Metadata| DDB[DynamoDB<br/>模型註冊表]
     end
 
     subgraph "訓練 (Serverless)"
-        Trigger[事件 / 排程] --> TrainingLambda[訓練 Lambda<br/> Python + Scikit-Learn]
+        Trigger[S3 ObjectCreated .csv] --> TrainingLambda[訓練 Lambda<br/> Python + Scikit-Learn]
         TrainingLambda -->|拉取資料| S3
-        TrainingLambda -->|儲存模型| S3
+        TrainingLambda -->|儲存 joblib + ONNX| S3
         TrainingLambda -->|註冊模型| DDB
         TrainingLambda -->|Logs| CW[CloudWatch Logs]
     end
@@ -46,9 +46,9 @@ graph TD
 ### 1. 基礎設施 (Terraform)
 *   **狀態管理**: 本地狀態 (Local State，為求簡化) 或 S3 遠端狀態。
 *   **模組 (Modules)**:
-    *   `s3`: 儲存訓練資料與模型產物 (`.joblib`)。
-    *   `dynamodb`: 儲存模型 Metadata (指標、版本、血緣)。
-    *   `lambda`: 執行 Python 容器映像檔 (訓練與推論)。
+    *   `s3`: 儲存訓練資料與模型產物 (`.joblib` + `.onnx`)。
+    *   `dynamodb`: 儲存模型 Metadata (指標、版本、血緣、`OnnxUrl`)。
+    *   `lambda`: 容器映像檔 — 訓練用 Python、推論用 Go。
     *   `api_gateway`: 透過 HTTP API 暴露推論服務。
     *   `ecr`: 儲存 Docker 容器映像檔。
     *   `iam`: 最小權限執行角色。
@@ -58,22 +58,25 @@ graph TD
 > 詳細流程請參考: [模型訓練流程](training_process_zh-TW.md)
 
 *   **運算資源**: AWS Lambda (Container Image)。
-*   **映像檔**: 基於 Python 3.9，包含 `scikit-learn`, `pandas`, `boto3`。
+*   **映像檔**: 基於 Python 3.9，包含 `scikit-learn`, `pandas`, `boto3`, `skl2onnx`。
+*   **觸發**: Raw Bucket 上傳 `.csv` 時的 S3 `ObjectCreated` 事件。
 *   **流程**:
     1.  從 S3 拉取資料集。
-    2.  訓練 Random Forest 模型。
-    3.  評估模型指標 (Accuracy, F1)。
-    4.  儲存模型產物至 S3 (`models/vX.Y.Z/model.joblib`)。
-    5.  寫入 Metadata 至 DynamoDB。
+    2.  訓練 `RandomForestRegressor` 模型。
+    3.  評估模型指標 (RMSE, MAE)。
+    4.  儲存模型產物至 S3 (`stock-prediction/<version>/model.joblib` 與 `model.onnx`)。
+    5.  寫入 Metadata 至 DynamoDB (`ArtifactUrl`, `OnnxUrl`, 指標, 狀態)。
 
 ### 3. 模型註冊表 (Model Registry)
 *   **儲存**: S3 用於大型檔案 (權重)，DynamoDB 用於 Metadata。
-*   **版本控制**: 透過 DynamoDB Items 管理語意化版本 (Semantic Versioning)。
+*   **版本控制**: 透過 DynamoDB Items 管理時間戳版本 (例如 `v20231027120000`)。
+*   **服務契約**: 推論端透過 `OnnxUrl` 載入 ONNX 產物。
 
 ### 4. 推論 API (Inference API)
-*   **運算資源**: AWS Lambda (Container Image)，針對低延遲優化。
-*   **路由**: AWS API Gateway (HTTP API)。
+*   **運算資源**: AWS Lambda (Container Image) — Go + Gin + ONNX Runtime。
+*   **路由**: AWS API Gateway (HTTP API) — `POST /predict`, `GET /health`。
 *   **流程**:
-    1.  接收 JSON 請求。
-    2.  從 S3 載入模型 (快取於 `/tmp` 以加速 Warm Start)。
-    3.  回傳預測結果。
+    1.  接收 JSON 請求 (`features: []float32`，長度 4)。
+    2.  從 DynamoDB 解析最新 `stable` / `canary` 模型。
+    3.  從 S3 下載 ONNX（Warm Start 時快取於記憶體 / `/tmp`）。
+    4.  以 ONNX Runtime 推論，回傳 `predicted_price` 與 `model_version`。

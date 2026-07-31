@@ -19,15 +19,21 @@
 - 無需管理伺服器 (Serverless)。
 - 自動縮減至零 (Scale to zero)。
 
-## 3. 訓練與推論皆使用 Python
-**背景**: 雖然推論服務可選用 Go 等高效語言，但 Lambda Container Images 簡化了依賴管理。
-**決策**: 訓練與推論 Lambda 皆使用 Python。
-**後果**: 程式碼庫較簡單；模型載入可共用相同的序列化格式 (`joblib`/`pickle`)。
+## 3. 訓練用 Python、推論用 Go（以 ONNX 銜接）
+**背景**: 訓練適合留在 Python ML 生態；推論則更需要輕量、低延遲的執行環境，以及語言中立的模型格式。
+**決策**:
+- **訓練 Lambda**: Python（`scikit-learn`, `pandas`, `skl2onnx`）。
+- **推論 Lambda**: Go（`Gin` + ONNX Runtime）。
+- **交換格式**: 同時匯出 `model.joblib`（除錯／血緣）與 `model.onnx`（服務用）。推論從 DynamoDB 的 `OnnxUrl` 載入模型。
+**後果**:
+- 訓練與服務職責分離更清晰。
+- 雙語言專案與 Docker build 稍複雜。
+- 推論映像檔不必打包沉重的 Python ML 依賴。
 
 ## 4. 自建模型註冊表 (DynamoDB + S3)
 **背景**: 需要模型版本控制，但不想承擔架設 MLflow Server 或使用 SageMaker Model Registry 的額外成本。
 **決策**: 使用 **S3** 儲存模型產物，**DynamoDB** 儲存 Metadata。
-**後果**: 簡單、Serverless 且具成本效益。切換版本僅需更新 Kubernetes 或 Lambda 指向的 DynamoDB Metadata (本案為 Lambda 拉取)。
+**後果**: 簡單、Serverless 且具成本效益。切換版本僅需更新 DynamoDB Metadata（提升 `Status` / 指向另一個 `OnnxUrl`）。
 
 ## 5. AWS Budgets 作為成本防線
 **背景**: 需要在資源意外產生費用時獲得自動警報。

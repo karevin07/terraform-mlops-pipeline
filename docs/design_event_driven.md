@@ -22,8 +22,8 @@ graph LR
     -   讀取該 CSV 檔案進行特徵工程與模型訓練。
     -   評估模型指標 (RMSE, MAE)。
 4.  **模型發布**:
-    -   訓練完成的模型 (`.joblib`) 儲存至 `S3 Model Bucket`。
-    -   模型元數據 (Metrics, Version, Location) 寫入 `DynamoDB`。
+    -   訓練完成的模型同時儲存 `.joblib`（血緣／除錯）與 `.onnx`（推論用）至 `S3 Model Bucket`。
+    -   模型元數據 (`Metrics`, `Version`, `ArtifactUrl`, `OnnxUrl`, `Status`) 寫入 `DynamoDB`。
 
 ## 4. Free Tier 成本評估 (Cost Analysis)
 本架構經過優化，確保在 AWS Free Tier 額度內運行。

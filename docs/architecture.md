@@ -13,15 +13,15 @@ graph TD
     User[User / Client] -->|HTTPS| APIGW[API Gateway]
     
     subgraph "Inference (Serverless)"
-        APIGW -->|Proxy| InferenceLambda[Inference Lambda<br/> Python + Scikit-Learn]
-        InferenceLambda -->|Load Model| S3[S3 Bucket<br/> Model Artifacts]
+        APIGW -->|Proxy| InferenceLambda[Inference Lambda<br/> Go + Gin + ONNX]
+        InferenceLambda -->|Load ONNX Model| S3[S3 Bucket<br/> Model Artifacts]
         InferenceLambda -->|Get Metadata| DDB[DynamoDB<br/> Model Registry]
     end
 
     subgraph "Training (Serverless)"
-        Trigger[Event / Schedule] --> TrainingLambda[Training Lambda<br/> Python + Scikit-Learn]
+        Trigger[S3 ObjectCreated .csv] --> TrainingLambda[Training Lambda<br/> Python + Scikit-Learn]
         TrainingLambda -->|Pull Data| S3
-        TrainingLambda -->|Save Model| S3
+        TrainingLambda -->|Save joblib + ONNX| S3
         TrainingLambda -->|Register Model| DDB
         TrainingLambda -->|Logs| CW[CloudWatch Logs]
     end
@@ -46,9 +46,9 @@ graph TD
 ### 1. Infrastructure (Terraform)
 *   **State Management**: Local state (for simplicity) or S3 remote state.
 *   **Modules**:
-    *   `s3`: Stores training data and model artifacts (`.joblib`).
-    *   `dynamodb`: Stores model metadata (metrics, version, lineage).
-    *   `lambda`: Python container images for Training and Inference.
+    *   `s3`: Stores training data and model artifacts (`.joblib` + `.onnx`).
+    *   `dynamodb`: Stores model metadata (metrics, version, lineage, `OnnxUrl`).
+    *   `lambda`: Container images — Python for training, Go for inference.
     *   `api_gateway`: Exposes the Inference Lambda via HTTP API.
     *   `ecr`: Stores Docker container images.
     *   `iam`: Least-privilege roles for execution.
@@ -56,22 +56,25 @@ graph TD
 
 ### 2. Training Pipeline
 *   **Compute**: AWS Lambda (Container Image).
-*   **Image**: Python 3.9 base, includes `scikit-learn`, `pandas`, `boto3`.
+*   **Image**: Python 3.9 base, includes `scikit-learn`, `pandas`, `boto3`, `skl2onnx`.
+*   **Trigger**: S3 `ObjectCreated` on `.csv` uploads to the raw bucket (event-driven).
 *   **Process**:
     1.  Fetch dataset from S3.
-    2.  Train Random Forest model.
-    3.  Evaluate metrics (Accuracy, F1).
-    4.  Save model artifact to S3 (`models/vX.Y.Z/model.joblib`).
-    5.  Log metadata to DynamoDB.
+    2.  Train `RandomForestRegressor` model.
+    3.  Evaluate metrics (RMSE, MAE).
+    4.  Save artifacts to S3 (`stock-prediction/<version>/model.joblib` and `model.onnx`).
+    5.  Log metadata to DynamoDB (`ArtifactUrl`, `OnnxUrl`, metrics, status).
 
 ### 3. Model Registry
 *   **Storage**: S3 for large files (weights), DynamoDB for metadata.
-*   **Versioning**: Semantic versioning managed via DynamoDB items.
+*   **Versioning**: Timestamp versions (e.g. `v20231027120000`) managed via DynamoDB items.
+*   **Serving contract**: Inference loads the ONNX artifact via `OnnxUrl`.
 
 ### 4. Inference API
-*   **Compute**: AWS Lambda (Container Image) optimized for low latency.
-*   **Routing**: AWS API Gateway (HTTP API).
+*   **Compute**: AWS Lambda (Container Image) — Go + Gin + ONNX Runtime.
+*   **Routing**: AWS API Gateway (HTTP API) — `POST /predict`, `GET /health`.
 *   **Flow**:
-    1.  Receives JSON payload.
-    2.  Loads model from S3 (cached in `/tmp` for warm starts).
-    3.  Returns prediction.
+    1.  Receives JSON payload (`features: []float32`, length 4).
+    2.  Resolves latest `stable` / `canary` model from DynamoDB.
+    3.  Downloads ONNX from S3 (cached in memory / `/tmp` for warm starts).
+    4.  Runs ONNX Runtime inference and returns `predicted_price` + `model_version`.

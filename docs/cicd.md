@@ -47,8 +47,9 @@ git push origin v0.1.0
     *   Plan changes (`terraform plan`).
     *   Apply changes (`terraform apply -auto-approve`).
 2.  **`deploy-lambda`** (Runs after `terraform` success):
+    *   Export Python deps for the training image (`training/requirements.txt`).
     *   Login to Amazon ECR.
-    *   Build Docker images for Training and Inference.
+    *   Build Docker images: **Training (Python)** and **Inference (Go + ONNX Runtime)**.
     *   Push images to ECR.
     *   Update Lambda functions to use the new images.
 
