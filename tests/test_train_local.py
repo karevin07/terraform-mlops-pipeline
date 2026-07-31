@@ -4,11 +4,13 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import os
 import sys
+import json
 
 # Add project root to sys.path
 sys.path.append(os.getcwd())
 
-from training.train import train_model, load_data, feature_engineering
+from training.train import train_model, load_data, feature_engineering, register_model
+from training.gate import decide_status
 
 class TestStockPredictionTraining(unittest.TestCase):
     
@@ -73,6 +75,18 @@ class TestStockPredictionTraining(unittest.TestCase):
         preds = model.predict(X_test)
         self.assertEqual(len(preds), len(y_test))
         print("Training test clean pass.")
+
+    @patch("training.train.table")
+    def test_register_model_uses_gate_status(self, mock_table):
+        metrics = {"rmse": 50.0, "mae": 40.0}
+        status = decide_status(metrics, 100.0, 80.0)
+        register_model("stock-prediction", "v20260101", metrics, "s3://bucket/model.joblib", status)
+
+        item = mock_table.put_item.call_args.kwargs["Item"]
+        self.assertIn(item["Status"], ("staging", "canary"))
+        self.assertEqual(item["Status"], status)
+        config = json.loads(item["Config"])
+        self.assertEqual(config["gate_status"], status)
 
 if __name__ == '__main__':
     unittest.main()

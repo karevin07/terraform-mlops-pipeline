@@ -15,6 +15,7 @@ from ta.trend import SMAIndicator
 from ta.momentum import RSIIndicator
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
+from training.gate import decide_status
 
 # Configuration
 S3_RAW_BUCKET = os.environ.get("S3_RAW_BUCKET")
@@ -22,6 +23,8 @@ S3_FEATURE_BUCKET = os.environ.get("S3_FEATURE_BUCKET")
 S3_MODEL_BUCKET = os.environ.get("S3_MODEL_BUCKET")
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE")
 REGION = os.environ.get("AWS_REGION", "us-east-1")
+RMSE_THRESHOLD = float(os.environ.get("RMSE_THRESHOLD", "100.0"))
+MAE_THRESHOLD = float(os.environ.get("MAE_THRESHOLD", "80.0"))
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -122,16 +125,26 @@ def save_onnx_model(model, bucket, key):
     buffer.seek(0)
     s3.put_object(Bucket=bucket, Key=key, Body=buffer)
 
-def register_model(model_name, version, metrics, artifact_path):
-    logger.info(f"Registering model {model_name}:{version} to DynamoDB")
+def register_model(model_name, version, metrics, artifact_path, status):
+    logger.info(
+        f"Registering model {model_name}:{version} status={status} "
+        f"(rmse_th={RMSE_THRESHOLD}, mae_th={MAE_THRESHOLD})"
+    )
     item = {
         "ModelName": model_name,
         "Version": version,
-        "Status": "training",
+        "Status": status,
         "Metrics": json.dumps(metrics),
         "ArtifactUrl": artifact_path,
         "OnnxUrl": artifact_path.replace(".joblib", ".onnx"),
-        "CreatedAt": datetime.utcnow().isoformat()
+        "CreatedAt": datetime.utcnow().isoformat(),
+        "Config": json.dumps(
+            {
+                "rmse_threshold": RMSE_THRESHOLD,
+                "mae_threshold": MAE_THRESHOLD,
+                "gate_status": status,
+            }
+        ),
     }
     table.put_item(Item=item)
 
@@ -160,7 +173,8 @@ def lambda_handler(event, context):
         # 3. Train
         model, metrics = train_model(df_processed)
         logger.info(f"Training metrics: {metrics}")
-        
+        status = decide_status(metrics, RMSE_THRESHOLD, MAE_THRESHOLD)
+
         # 4. Save Artifact
         version = datetime.now().strftime("v%Y%m%d%H%M%S")
         model_name = "stock-prediction" 
@@ -171,11 +185,20 @@ def lambda_handler(event, context):
         save_onnx_model(model, S3_MODEL_BUCKET, onnx_key)
         
         # 5. Register
-        register_model(model_name, version, metrics, f"s3://{S3_MODEL_BUCKET}/{artifact_key}")
-        
+        register_model(
+            model_name, version, metrics, f"s3://{S3_MODEL_BUCKET}/{artifact_key}", status
+        )
+
         return {
             "statusCode": 200,
-            "body": json.dumps({"message": "Training successful", "version": version, "metrics": metrics})
+            "body": json.dumps(
+                {
+                    "message": "Training successful",
+                    "version": version,
+                    "metrics": metrics,
+                    "status": status,
+                }
+            ),
         }
     except Exception as e:
         logger.error(f"Training failed: {e}")
