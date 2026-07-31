@@ -130,13 +130,25 @@ logs-training: ## Show recent CloudWatch logs for Training Lambda
 check-model: ## List model artifacts in S3 Model Bucket
 	aws s3 ls s3://$(S3_MODEL_BUCKET)/stock-prediction/ --recursive --human-readable --summarize
 
-check-metadata: ## Scan DynamoDB for training results
-	aws dynamodb scan \
+check-metadata: ## List recent model registry items for stock-prediction
+	aws dynamodb query \
 		--table-name $(DYNAMODB_TABLE) \
-		--expression-attribute-names '{"#S": "Status"}' \
-		--expression-attribute-values '{":v": {"S": "training"}}' \
-		--filter-expression "#S = :v" \
+		--key-condition-expression "ModelName = :m" \
+		--expression-attribute-values '{":m": {"S": "stock-prediction"}}' \
+		--scan-index-forward false \
+		--limit 10 \
 		--output json
+
+list-models: ## List recent model registry versions
+	uv run python scripts/promote_model.py list
+
+promote-stable: ## Promote VERSION=... to stable (archives previous stable)
+	@if [ -z "$(VERSION)" ]; then echo "Usage: make promote-stable VERSION=vYYYYMMDDHHMMSS"; exit 1; fi
+	uv run python scripts/promote_model.py promote --version $(VERSION)
+
+rollback: ## Rollback stable to VERSION=...
+	@if [ -z "$(VERSION)" ]; then echo "Usage: make rollback VERSION=vYYYYMMDDHHMMSS"; exit 1; fi
+	uv run python scripts/promote_model.py rollback --version $(VERSION)
 
 ##@ Help
 help:  ## display this help
