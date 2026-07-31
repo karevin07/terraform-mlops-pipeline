@@ -39,3 +39,6 @@ secret_key_file/
 # Local Artifacts
 model.onnx
 response.json
+
+# Git worktrees
+.worktrees/
