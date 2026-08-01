@@ -21,7 +21,7 @@ resource "aws_apigatewayv2_stage" "default" {
 
   access_log_settings {
     destination_arn = var.cloudwatch_log_group_arn
-    format         = jsonencode({
+    format = jsonencode({
       requestId      = "$context.requestId"
       ip             = "$context.identity.sourceIp"
       requestTime    = "$context.requestTime"

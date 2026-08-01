@@ -36,14 +36,14 @@ module "iam" {
 module "lambda" {
   source = "./modules/lambda"
 
-  project_name             = var.project_name
-  environment              = var.environment
+  project_name              = var.project_name
+  environment               = var.environment
   lambda_execution_role_arn = module.iam.lambda_execution_role_arn
-  ecr_repository_url       = module.ecr.repository_url
-  s3_raw_bucket            = module.s3.raw_bucket_id
-  s3_feature_bucket        = module.s3.feature_bucket_id
-  s3_model_bucket          = module.s3.model_bucket_id
-  dynamodb_table_name      = module.dynamodb.table_name
+  ecr_repository_url        = module.ecr.repository_url
+  s3_raw_bucket             = module.s3.raw_bucket_id
+  s3_feature_bucket         = module.s3.feature_bucket_id
+  s3_model_bucket           = module.s3.model_bucket_id
+  dynamodb_table_name       = module.dynamodb.table_name
   api_gateway_execution_arn = module.api_gateway.execution_arn
 }
 
@@ -62,9 +62,9 @@ module "api_gateway" {
 module "cloudwatch" {
   source = "./modules/cloudwatch"
 
-  project_name            = var.project_name
-  environment             = var.environment
-  alert_email = var.alert_email
+  project_name = var.project_name
+  environment  = var.environment
+  alert_email  = var.alert_email
   # Must match Lambda function names in modules/lambda/main.tf (passed as strings to avoid circular deps).
   training_function_name  = "${var.project_name}-${var.environment}-training"
   inference_function_name = "${var.project_name}-${var.environment}-inference"
