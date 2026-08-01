@@ -1,5 +1,5 @@
-# Load environment variables
-include .env
+# Load environment variables (optional — CI / fresh worktrees may omit .env)
+-include .env
 export
 
 # Default values if .env is missing or variables are not set
@@ -16,7 +16,7 @@ TRAINING_TAG = training-latest
 INFERENCE_TAG = inference-latest
 
 ##@ Setup
-.PHONY: install format test docker clean help
+.PHONY: install format test test-unit tf-validate smoke docker clean help
 
 install: ## Install dependencies (Python & Go)
 	@echo "Installing Python dependencies..."
@@ -30,11 +30,19 @@ format: ## Format code (Python & Go)
 	@echo "Formatting Python code..."
 	@uv run ruff format . || echo "Ruff not found, skipping"
 
-test: test-local-training test-local-inference ## Run all local tests
+test-unit: ## Fast unit tests (no Docker) for CI
+	uv run python -m unittest tests.test_gate tests.test_promote_logic -v
+
+test: test-unit test-local-training test-local-inference ## Run all local tests
 
 ##@ Infrastructure
 tf-init: ## Initialize Terraform
 	cd infra && terraform init
+
+tf-validate: ## terraform fmt -check + validate (no backend)
+	cd infra && terraform fmt -check -recursive
+	cd infra && terraform init -backend=false -input=false
+	cd infra && terraform validate
 
 tf-plan: ## Plan Terraform changes
 	cd infra && terraform plan
@@ -121,6 +129,16 @@ predict-lambda: ## Send a test request to the deployed Lambda Inference API
 	fi; \
 	echo "API URL: $$API_URL/predict"; \
 	curl -s -X POST "$$API_URL/predict" \
+		-H "Content-Type: application/json" \
+		-d '{"features": [150.5, 65.2, 148.0, 5000000.0]}' | jq .
+
+smoke: ## Hit deployed /health and /predict
+	@API_URL=$$(cd infra && terraform output -raw inference_api_url); \
+	if [ -z "$$API_URL" ]; then echo "Missing inference_api_url — run make tf-apply first"; exit 1; fi; \
+	echo "GET $$API_URL/health"; \
+	curl -sf "$$API_URL/health" | jq .; \
+	echo "POST $$API_URL/predict"; \
+	curl -sf -X POST "$$API_URL/predict" \
 		-H "Content-Type: application/json" \
 		-d '{"features": [150.5, 65.2, 148.0, 5000000.0]}' | jq .
 
