@@ -30,6 +30,17 @@ graph TD
     style CI fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
+## Pull Request CI
+
+工作流程：`.github/workflows/ci.yml`（在 PR / push 到 `main` 時觸發）。
+
+| 檢查 | 執行內容 |
+|------|----------|
+| Terraform | `terraform fmt -check -recursive`、`init -backend=false`、`validate` |
+| 單元測試 | `tests.test_gate`、`tests.test_promote_logic` |
+
+Tag `v*` 部署仍由 `.github/workflows/deploy.yml` 負責，並需要 AWS 憑證。
+
 ### 觸發條件
 
 此流程**僅在**推送以 `v` 開頭的 git 標籤 (Tag) 時觸發。

@@ -30,6 +30,17 @@ graph TD
     style CI fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
+## Pull Request CI
+
+Workflow: `.github/workflows/ci.yml` (on PR / push to `main`).
+
+| Check | What it runs |
+|-------|----------------|
+| Terraform | `terraform fmt -check -recursive`, `init -backend=false`, `validate` |
+| Unit tests | `tests.test_gate`, `tests.test_promote_logic` |
+
+Deploy on tag `v*` remains in `.github/workflows/deploy.yml` and still requires AWS credentials.
+
 ### Trigger
 
 The workflow is triggered **ONLY** when a git tag starting with `v` is pushed.
