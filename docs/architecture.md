@@ -53,6 +53,7 @@ graph TD
     *   `ecr`: Stores Docker container images.
     *   `iam`: Least-privilege roles for execution.
     *   `budgets`: Cost guardrails ($0.01 limit).
+    *   `cloudwatch`: Lambda log groups under `/aws/lambda/...`, API Gateway access logs under `/aws/apigateway/...`, SNS email alarms for Lambda Errors/Duration and API 5xx. Confirm the SNS subscription email after first apply.
 
 ### 2. Training Pipeline
 *   **Compute**: AWS Lambda (Container Image).

@@ -53,6 +53,7 @@ graph TD
     *   `ecr`: 儲存 Docker 容器映像檔。
     *   `iam`: 最小權限執行角色。
     *   `budgets`: 成本預算監控 ($0.01 限制)。
+    *   `cloudwatch`: Lambda log groups 位於 `/aws/lambda/...`，API Gateway access logs 位於 `/aws/apigateway/...`；SNS email 告警涵蓋 Lambda Errors/Duration 與 API 5xx。首次 apply 後請確認 SNS 訂閱信。
 
 ### 2. 訓練流水線 (Training Pipeline)
 > 詳細流程請參考: [模型訓練流程](training_process_zh-TW.md)

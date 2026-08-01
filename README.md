@@ -91,6 +91,7 @@ flowchart TB
 
 ### Cost Guardrails
 - **AWS Budgets**: $0.01 threshold alarm with email notification
+- **CloudWatch Alarms**: Lambda Errors / Duration + API Gateway 5xx → SNS email (`alert_email` in tfvars). Confirm the SNS subscription after first apply.
 - **ECR Lifecycle**: Keep only last 5 images
 - **S3 Lifecycle**: Auto-delete model artifacts after 30 days
 - **Lambda Limits**: Training timeout 15min, memory capped

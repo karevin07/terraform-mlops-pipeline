@@ -90,6 +90,7 @@ flowchart TB
 
 ### 成本防護機制 (Cost Guardrails)
 - **AWS Budgets**: 設定 $0.01 閾值警報，並發送電子郵件通知
+- **CloudWatch Alarms**: Lambda Errors / Duration + API Gateway 5xx → SNS email（tfvars 的 `alert_email`）。首次 apply 後請確認 SNS 訂閱信。
 - **ECR Lifecycle**: 僅保留最近 5 個映像檔
 - **S3 Lifecycle**: 30 天後自動刪除模型產物
 - **Lambda 限制**: 訓練超時設定為 15 分鐘，記憶體設有上限
