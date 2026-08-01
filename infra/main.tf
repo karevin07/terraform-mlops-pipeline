@@ -63,7 +63,8 @@ module "cloudwatch" {
 
   project_name            = var.project_name
   environment             = var.environment
-  alert_email             = var.alert_email
+  alert_email = var.alert_email
+  # Must match Lambda function names in modules/lambda/main.tf (passed as strings to avoid circular deps).
   training_function_name  = "${var.project_name}-${var.environment}-training"
   inference_function_name = "${var.project_name}-${var.environment}-inference"
 }

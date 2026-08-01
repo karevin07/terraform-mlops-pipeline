@@ -42,6 +42,29 @@ resource "aws_sns_topic_subscription" "alerts_email" {
   endpoint  = var.alert_email
 }
 
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+resource "aws_sns_topic_policy" "alerts" {
+  arn = aws_sns_topic.alerts.arn
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowCloudWatchPublish"
+      Effect    = "Allow"
+      Principal = { Service = "cloudwatch.amazonaws.com" }
+      Action    = "SNS:Publish"
+      Resource  = aws_sns_topic.alerts.arn
+      Condition = {
+        ArnLike = {
+          "aws:SourceArn" = "arn:aws:cloudwatch:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:alarm:*"
+        }
+      }
+    }]
+  })
+}
+
 resource "aws_cloudwatch_metric_alarm" "training_errors" {
   alarm_name          = "${var.project_name}-${var.environment}-training-errors"
   comparison_operator = "GreaterThanThreshold"
