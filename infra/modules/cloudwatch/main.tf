@@ -1,10 +1,15 @@
 resource "aws_cloudwatch_log_group" "training" {
-  name              = "/ecs/${var.project_name}-${var.environment}-training"
-  retention_in_days = 7 # Keep short for Free Tier
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-training"
+  retention_in_days = 7
 }
 
 resource "aws_cloudwatch_log_group" "inference" {
-  name              = "/ecs/${var.project_name}-${var.environment}-inference"
+  name              = "/aws/lambda/${var.project_name}-${var.environment}-inference"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "api_gateway" {
+  name              = "/aws/apigateway/${var.project_name}-${var.environment}"
   retention_in_days = 7
 }
 

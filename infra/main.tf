@@ -54,7 +54,7 @@ module "api_gateway" {
   project_name             = var.project_name
   environment              = var.environment
   inference_invoke_arn     = module.lambda.inference_invoke_arn
-  cloudwatch_log_group_arn = module.cloudwatch.inference_log_group_arn
+  cloudwatch_log_group_arn = module.cloudwatch.api_gateway_log_group_arn
 }
 
 # --- Monitoring ---
