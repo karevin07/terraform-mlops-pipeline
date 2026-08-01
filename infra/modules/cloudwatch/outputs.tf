@@ -9,3 +9,7 @@ output "inference_log_group_name" {
 output "api_gateway_log_group_arn" {
   value = aws_cloudwatch_log_group.api_gateway.arn
 }
+
+output "alerts_topic_arn" {
+  value = aws_sns_topic.alerts.arn
+}

@@ -61,8 +61,11 @@ module "api_gateway" {
 module "cloudwatch" {
   source = "./modules/cloudwatch"
 
-  project_name = var.project_name
-  environment  = var.environment
+  project_name            = var.project_name
+  environment             = var.environment
+  alert_email             = var.alert_email
+  training_function_name  = "${var.project_name}-${var.environment}-training"
+  inference_function_name = "${var.project_name}-${var.environment}-inference"
 }
 
 # --- Cost Guardrail ---
