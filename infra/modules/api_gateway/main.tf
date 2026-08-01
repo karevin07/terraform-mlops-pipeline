@@ -52,3 +52,22 @@ resource "aws_apigatewayv2_route" "health" {
   route_key = "GET /health"
   target    = "integrations/${aws_apigatewayv2_integration.inference.id}"
 }
+
+resource "aws_cloudwatch_metric_alarm" "api_5xx" {
+  alarm_name          = "${var.project_name}-${var.environment}-api-5xx"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "5xx"
+  namespace           = "AWS/ApiGateway"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  alarm_description   = "API Gateway HTTP API 5xx > 0"
+  alarm_actions       = [var.sns_topic_arn]
+
+  dimensions = {
+    ApiId = aws_apigatewayv2_api.main.id
+    Stage = aws_apigatewayv2_stage.default.name
+  }
+}
