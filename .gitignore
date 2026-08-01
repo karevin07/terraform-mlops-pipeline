@@ -42,3 +42,6 @@ response.json
 
 # Git worktrees
 .worktrees/
+
+# Local agent plans/specs (not committed)
+docs/superpowers/
